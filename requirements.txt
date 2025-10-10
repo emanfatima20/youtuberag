@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+youtube-transcript-api
+langchain
+langchain_community
+langchain-huggingface
+sentence-transformers
+chromadb
+torch
+transformers
+huggingface-hub
