@@ -13,10 +13,9 @@ import pickle
 import traceback
 from dotenv import load_dotenv
 import time
+import re
 
-# Load environment variables
-
-# Get your Hugging Face API key from Streamlit Secrets
+# ------------------ LOAD API KEY ------------------ #
 hf_token = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
 
 # ------------------ PAGE CONFIG ------------------ #
@@ -95,7 +94,6 @@ with col1:
     st.markdown("### 📺 Enter YouTube Details")
     video_id = st.text_input("YouTube Video ID", placeholder="e.g. dQw4w9WgXcQ")
     question = st.text_area("💬 Ask a Question", placeholder="What is this video about?")
-
     run_query = st.button("🚀 Ask Question", use_container_width=True)
 
 with col2:
@@ -107,7 +105,17 @@ with col2:
 
 st.markdown("---")
 
-# ------------------ MAIN FUNCTIONALITY (UNCHANGED) ------------------ #
+# ------------------ HELPER: CLEAN MODEL OUTPUT ------------------ #
+def clean_model_response(text: str) -> str:
+    """Remove unwanted instruction tokens or tags from model output."""
+    if not text:
+        return ""
+    cleaned = re.sub(r"\[/?(USER|ASS|INST)\]", "", text)
+    cleaned = re.sub(r"<\|/?(user|assistant)\|>", "", cleaned)
+    cleaned = cleaned.replace("🗣️ Answer", "").strip()
+    return cleaned
+
+# ------------------ MAIN FUNCTIONALITY ------------------ #
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_transcript_optimized(video_id: str) -> str:
     st.info("🎧 Fetching transcript from YouTube...")
@@ -164,11 +172,8 @@ def load_llm():
 
 def get_vectorstore_optimized(video_id: str, docs):
     embedding_model = load_embedding_model()
-    
-    # ✅ Ensure directories exist before saving
     os.makedirs("rag_data/transcripts", exist_ok=True)
     os.makedirs("rag_data/chroma_db", exist_ok=True)
-    
     metadata_file = f"rag_data/transcripts/{video_id}.pkl"
     vector_store_path = "rag_data/chroma_db"
     if os.path.exists(metadata_file):
@@ -239,16 +244,7 @@ if run_query:
             full_response = ""
             for chunk in rag_chain.stream(question):
                 full_response += chunk
-
-                # ✅ Clean unwanted user/assistant tokens before display
-                cleaned_response = (
-                    full_response.replace("[/USER]", "")
-                    .replace("[/ASS]", "")
-                    .replace("<|user|>", "")
-                    .replace("<|assistant|>", "")
-                    .strip()
-                )
-
+                cleaned_response = clean_model_response(full_response)
                 response_container.markdown(f"### 🗣️ Answer\n{cleaned_response}")
 
             progress_bar.progress(100)
