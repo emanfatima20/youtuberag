@@ -239,7 +239,17 @@ if run_query:
             full_response = ""
             for chunk in rag_chain.stream(question):
                 full_response += chunk
-                response_container.markdown(f"### 🗣️ Answer\n{full_response}")
+
+                # ✅ Clean unwanted user/assistant tokens before display
+                cleaned_response = (
+                    full_response.replace("[/USER]", "")
+                    .replace("[/ASS]", "")
+                    .replace("<|user|>", "")
+                    .replace("<|assistant|>", "")
+                    .strip()
+                )
+
+                response_container.markdown(f"### 🗣️ Answer\n{cleaned_response}")
 
             progress_bar.progress(100)
             status_text.text("✅ Done!")
