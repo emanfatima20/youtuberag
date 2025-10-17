@@ -162,7 +162,7 @@ def load_embedding_model():
 def load_llm():
     st.info("🧠 Loading language model...")
     return ChatHuggingFace(llm=HuggingFaceEndpoint(
-        model='meta-llama/Llama-3.2-1B-Instruct,
+        model='meta-llama/Llama-3.2-1B-Instruct',
         task='text-generation',
 
         huggingfacehub_api_token=hf_token
@@ -268,4 +268,5 @@ with st.sidebar:
 # ------------------ FOOTER ------------------ #
 st.markdown("---")
 st.caption("© 2025 YouTube RAG Chatbot — Powered by LangChain & HuggingFace")
+
 
