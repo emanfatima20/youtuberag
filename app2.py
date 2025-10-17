@@ -18,11 +18,7 @@ import re
 hf_token = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
 
 # ------------------ PAGE CONFIG ------------------ #
-st.set_page_config(
-    page_title="🎥 YouTube RAG Chatbot",
-    page_icon="🤖",
-    layout="wide"
-)
+st.set_page_config(page_title="🎥 YouTube RAG Chatbot", page_icon="🤖", layout="wide")
 
 # ------------------ CUSTOM CSS ------------------ #
 st.markdown("""
@@ -88,7 +84,6 @@ st.markdown("""
 
 # ------------------ MAIN CONTENT ------------------ #
 col1, col2 = st.columns([2, 3])
-
 with col1:
     st.markdown("### 📺 Enter YouTube Details")
     video_id = st.text_input("YouTube Video ID", placeholder="e.g. dQw4w9WgXcQ")
@@ -106,13 +101,13 @@ st.markdown("---")
 
 # ------------------ CLEAN MODEL OUTPUT ------------------ #
 def clean_model_response(text: str) -> str:
-    """Remove unwanted instruction tokens or tags from model output."""
     if not text:
         return ""
     cleaned = re.sub(r"\[/?(USER|ASS|INST)\]", "", text)
     cleaned = re.sub(r"<\|/?(user|assistant)\|>", "", cleaned)
     cleaned = cleaned.replace("🗣️ Answer", "").strip()
-    return cleaned
+    cleaned = re.sub(r"(?i)\b(as an ai|i am an ai|language model)\b.*", "", cleaned)
+    return cleaned.strip()
 
 # ------------------ FETCH TRANSCRIPT ------------------ #
 @st.cache_data(show_spinner=False, ttl=3600)
@@ -158,7 +153,7 @@ def load_embedding_model():
         encode_kwargs={'normalize_embeddings': True}
     )
 
-# ------------------ LLM MODEL (MISTRAL) ------------------ #
+# ------------------ LLM MODEL ------------------ #
 @st.cache_resource
 def load_llm():
     st.info("🧠 Loading language model...")
@@ -177,9 +172,11 @@ def get_vectorstore_optimized(video_id: str, docs):
     os.makedirs("rag_data/chroma_db", exist_ok=True)
     metadata_file = f"rag_data/transcripts/{video_id}.pkl"
     vector_store_path = "rag_data/chroma_db"
+
     if os.path.exists(metadata_file):
         st.info(f"📂 Using cached embeddings for `{video_id}`.")
         return Chroma(persist_directory=vector_store_path, embedding_function=embedding_model)
+
     st.info(f"🧠 Creating embeddings for `{video_id}`...")
     all_texts = [doc.page_content for doc in docs]
     vector_store = Chroma(embedding_function=embedding_model, persist_directory=vector_store_path)
@@ -191,26 +188,33 @@ def get_vectorstore_optimized(video_id: str, docs):
         progress = min((i + batch_size) / len(all_texts), 1.0)
         progress_bar.progress(progress)
     vector_store.persist()
+
     with open(metadata_file, "wb") as f:
         pickle.dump({"video_id": video_id, "chunks": len(docs), "created_at": time.time()}, f)
+
     return vector_store
 
 # ------------------ HELPER FUNCTIONS ------------------ #
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
+# ✅ STRONGER PROMPT TO FORCE CONTEXT-ONLY ANSWERS
 def create_rag_chain(retriever, model):
     prompt = PromptTemplate(
         template=(
-            "You are a helpful and knowledgeable AI assistant. "
-            "Use the provided video transcript context to answer the user's question clearly and concisely. "
-            "If the answer is not in the context, say 'I don’t know.'\n\n"
-            "Context:\n{context}\n\n"
-            "Question: {query}\n\n"
+            "You are an AI assistant that must answer questions *strictly based on the YouTube video transcript provided below*.\n\n"
+            "Rules:\n"
+            "- Only use information explicitly mentioned in the transcript.\n"
+            "- Do NOT use any external or general knowledge.\n"
+            "- If the answer is not present in the transcript, respond exactly with: \"I don’t know.\"\n"
+            "- Be concise and factual.\n\n"
+            "Transcript:\n{context}\n\n"
+            "User Question: {query}\n\n"
             "Answer:"
         ),
         input_variables=["query", "context"]
     )
+
     return (
         {"context": retriever | format_docs, "query": RunnablePassthrough()}
         | prompt
@@ -233,6 +237,7 @@ if run_query:
             status_text.text("🎧 Fetching transcript...")
             full_text = fetch_transcript_optimized(video_id)
             progress_bar.progress(40)
+
             if not full_text.strip():
                 st.error("No transcript found. Try another video.")
                 st.stop()
@@ -244,13 +249,21 @@ if run_query:
 
             status_text.text("🔍 Setting up vector search...")
             vector_store = get_vectorstore_optimized(video_id, docs)
-            retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 3, "filter": {"video_id": video_id}})
+            retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 2})
             progress_bar.progress(80)
+
+            # ✅ SAFEGUARD: if retriever finds nothing
+            retrieved_docs = retriever.get_relevant_documents(question)
+            if not retrieved_docs:
+                st.warning("⚠️ No relevant context found in transcript.")
+                st.markdown("### 🗣️ Answer\nI don’t know.")
+                st.stop()
 
             status_text.text("🤖 Generating AI answer...")
             rag_chain = create_rag_chain(retriever, model)
             response_container = st.empty()
             full_response = ""
+
             for chunk in rag_chain.stream(question):
                 full_response += chunk
                 cleaned_response = clean_model_response(full_response)
