@@ -18,7 +18,8 @@ import time
 # Load environment variables
 
 # Get your Hugging Face API key from Streamlit Secrets
-hf_token = os.environ["HUGGINGFACEHUB_API_TOKEN"]
+hf_token = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
+
 # ------------------ PAGE CONFIG ------------------ #
 st.set_page_config(
     page_title="🎥 YouTube RAG Chatbot",
@@ -261,4 +262,5 @@ with st.sidebar:
 # ------------------ FOOTER ------------------ #
 st.markdown("---")
 st.caption("© 2025 YouTube RAG Chatbot — Powered by LangChain & HuggingFace")
+
 
