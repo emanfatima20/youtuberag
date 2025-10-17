@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pydantic
+langchain
+langchain_community
+langchain-huggingface
+sentence-transformers
+chromadb
+torch
+transformers
+huggingface-hub
+yt-dlp
+python-dotenv
+requests
+streamlit 
