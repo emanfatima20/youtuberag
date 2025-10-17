@@ -1,4 +1,3 @@
-
 import streamlit as st
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -30,7 +29,6 @@ st.set_page_config(
 # ------------------ CUSTOM CSS ------------------ #
 st.markdown("""
     <style>
-        /* Background Gradient */
         body {
             background: linear-gradient(135deg, #0f172a, #1e293b);
             color: white;
@@ -98,7 +96,6 @@ with col1:
     video_id = st.text_input("YouTube Video ID", placeholder="e.g. dQw4w9WgXcQ")
     question = st.text_area("💬 Ask a Question", placeholder="What is this video about?")
 
-    # Action Button
     run_query = st.button("🚀 Ask Question", use_container_width=True)
 
 with col2:
@@ -159,14 +156,19 @@ def load_llm():
     return ChatHuggingFace(llm=HuggingFaceEndpoint(
         model='HuggingFaceH4/zephyr-7b-beta',
         task='text-generation',
-             max_new_tokens=512,
-            temperature=0.3,
-            timeout=30,
-            huggingfacehub_api_token=hf_token  # ✅ pass token here
+        max_new_tokens=512,
+        temperature=0.3,
+        timeout=30,
+        huggingfacehub_api_token=hf_token
     ))
 
 def get_vectorstore_optimized(video_id: str, docs):
     embedding_model = load_embedding_model()
+    
+    # ✅ Ensure directories exist before saving
+    os.makedirs("rag_data/transcripts", exist_ok=True)
+    os.makedirs("rag_data/chroma_db", exist_ok=True)
+    
     metadata_file = f"rag_data/transcripts/{video_id}.pkl"
     vector_store_path = "rag_data/chroma_db"
     if os.path.exists(metadata_file):
@@ -262,5 +264,3 @@ with st.sidebar:
 # ------------------ FOOTER ------------------ #
 st.markdown("---")
 st.caption("© 2025 YouTube RAG Chatbot — Powered by LangChain & HuggingFace")
-
-
