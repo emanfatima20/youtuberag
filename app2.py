@@ -11,7 +11,6 @@ import requests
 import os
 import pickle
 import traceback
-from dotenv import load_dotenv
 import time
 import re
 
@@ -105,7 +104,7 @@ with col2:
 
 st.markdown("---")
 
-# ------------------ HELPER: CLEAN MODEL OUTPUT ------------------ #
+# ------------------ CLEAN MODEL OUTPUT ------------------ #
 def clean_model_response(text: str) -> str:
     """Remove unwanted instruction tokens or tags from model output."""
     if not text:
@@ -115,7 +114,7 @@ def clean_model_response(text: str) -> str:
     cleaned = cleaned.replace("🗣️ Answer", "").strip()
     return cleaned
 
-# ------------------ MAIN FUNCTIONALITY ------------------ #
+# ------------------ FETCH TRANSCRIPT ------------------ #
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_transcript_optimized(video_id: str) -> str:
     st.info("🎧 Fetching transcript from YouTube...")
@@ -149,6 +148,7 @@ def fetch_transcript_optimized(video_id: str) -> str:
         st.warning(f"Transcript extraction warning: {str(e)}")
     return transcript_text[:50000]
 
+# ------------------ EMBEDDING MODEL ------------------ #
 @st.cache_resource
 def load_embedding_model():
     st.info("🚀 Loading embedding model...")
@@ -158,16 +158,19 @@ def load_embedding_model():
         encode_kwargs={'normalize_embeddings': True}
     )
 
+# ------------------ LLM MODEL (MISTRAL) ------------------ #
 @st.cache_resource
 def load_llm():
     st.info("🧠 Loading language model...")
-    return ChatHuggingFace(llm=HuggingFaceEndpoint(
-        model='meta-llama/Llama-3.2-1B-Instruct',
-        task='text-generation',
+    return ChatHuggingFace(
+        llm=HuggingFaceEndpoint(
+            model="mistralai/Mistral-7B-Instruct-v0.2",
+            task="text-generation",
+            huggingfacehub_api_token=hf_token,
+        )
+    )
 
-        huggingfacehub_api_token=hf_token
-    ))
-
+# ------------------ VECTOR STORE ------------------ #
 def get_vectorstore_optimized(video_id: str, docs):
     embedding_model = load_embedding_model()
     os.makedirs("rag_data/transcripts", exist_ok=True)
@@ -192,12 +195,20 @@ def get_vectorstore_optimized(video_id: str, docs):
         pickle.dump({"video_id": video_id, "chunks": len(docs), "created_at": time.time()}, f)
     return vector_store
 
+# ------------------ HELPER FUNCTIONS ------------------ #
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
 def create_rag_chain(retriever, model):
     prompt = PromptTemplate(
-        template="You are a helpful assistant. Use ONLY the following context to answer.\nIf unsure, say 'I don't know.'\n\nContext:\n{context}\n\nQuestion:\n{query}\nAnswer:",
+        template=(
+            "You are a helpful and knowledgeable AI assistant. "
+            "Use the provided video transcript context to answer the user's question clearly and concisely. "
+            "If the answer is not in the context, say 'I don’t know.'\n\n"
+            "Context:\n{context}\n\n"
+            "Question: {query}\n\n"
+            "Answer:"
+        ),
         input_variables=["query", "context"]
     )
     return (
@@ -207,7 +218,7 @@ def create_rag_chain(retriever, model):
         | StrOutputParser()
     )
 
-# ------------------ EXECUTION ------------------ #
+# ------------------ MAIN EXECUTION ------------------ #
 if run_query:
     if not video_id or not question:
         st.warning("Please provide both a YouTube video ID and a question.")
@@ -268,5 +279,3 @@ with st.sidebar:
 # ------------------ FOOTER ------------------ #
 st.markdown("---")
 st.caption("© 2025 YouTube RAG Chatbot — Powered by LangChain & HuggingFace")
-
-
