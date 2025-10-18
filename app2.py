@@ -255,7 +255,8 @@ if run_query:
             progress_bar.progress(80)
 
             # ✅ SAFEGUARD: if retriever finds nothing
-            retrieved_docs = retriever.get_relevant_documents(question)
+            retrieved_docs = retriever.invoke(question)
+
             if not retrieved_docs:
                 st.warning("⚠️ No relevant context found in transcript.")
                 st.markdown("### 🗣️ Answer\nI don’t know.")
@@ -294,5 +295,6 @@ with st.sidebar:
 # ------------------ FOOTER ------------------ #
 st.markdown("---")
 st.caption("© 2025 YouTube RAG Chatbot — Powered by LangChain & HuggingFace")
+
 
 
