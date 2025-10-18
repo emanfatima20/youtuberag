@@ -6,7 +6,8 @@ from langchain_huggingface import HuggingFaceEmbeddings, ChatHuggingFace, Huggin
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers.string import StrOutputParser
-from langchain.schema import Document
+from langchain_core.documents import Document
+
 import yt_dlp
 import requests
 import os
@@ -293,4 +294,5 @@ with st.sidebar:
 # ------------------ FOOTER ------------------ #
 st.markdown("---")
 st.caption("© 2025 YouTube RAG Chatbot — Powered by LangChain & HuggingFace")
+
 
